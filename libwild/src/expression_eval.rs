@@ -768,7 +768,9 @@ mod tests {
         let auxiliary =
             crate::input_data::AuxiliaryFiles::new(&args, &arena, &OsFileSystem).unwrap();
         let herd = Default::default();
-        let mut symbol_db = SymbolDb::<Elf64>::new(&args, output_kind, &auxiliary, &herd).unwrap();
+        let herd_drops = Default::default();
+        let mut symbol_db =
+            SymbolDb::<Elf64>::new(&args, output_kind, &auxiliary, &herd, &herd_drops).unwrap();
         f(&layouts, &sections, &mut symbol_db)
     }
 

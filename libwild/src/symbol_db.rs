@@ -98,6 +98,9 @@ pub struct SymbolDb<'data, P: Platform> {
     pub(crate) output_kind: OutputKind,
     pub(crate) herd: &'data bumpalo_herd::Herd,
 
+    /// Drops the values that we allocate in `herd` that need dropping.
+    pub(crate) herd_drops: &'data crate::herd_drops::HerdDrops,
+
     /// The next input section ID to assign. Updated by `create_groups` so that subsequent calls
     /// (e.g. for LTO output objects) continue from where the previous call left off.
     pub(crate) next_input_section_id: crate::input_section_id::InputSectionId,
@@ -335,6 +338,7 @@ impl<'data, P: Platform> SymbolDb<'data, P> {
         output_kind: OutputKind,
         auxiliary: &AuxiliaryFiles<'data>,
         herd: &'data bumpalo_herd::Herd,
+        herd_drops: &'data crate::herd_drops::HerdDrops,
     ) -> Result<Self> {
         let version_script = auxiliary
             .version_script_data
@@ -368,6 +372,7 @@ impl<'data, P: Platform> SymbolDb<'data, P> {
             entry: None,
             output_kind,
             herd,
+            herd_drops,
             section_part_ids: Vec::new(),
             next_input_section_id: crate::input_section_id::InputSectionId::from_usize(0),
         };

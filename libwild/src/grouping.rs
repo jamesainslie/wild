@@ -187,6 +187,10 @@ pub(crate) fn create_groups<'data, P: Platform>(
 
             let objects_slice =
                 allocator.alloc_slice_fill_iter(core::mem::take(&mut group_objects));
+            // SAFETY: The herd keeps the objects allocated until the linker is dropped, which drops
+            // `herd_drops` first. Nothing else drops them. Their drop glue only frees memory that
+            // they own and reads nothing that they borrow.
+            let objects_slice = unsafe { symbol_db.herd_drops.adopt(objects_slice) };
 
             symbol_db.add_group(Group::Objects(objects_slice));
         }

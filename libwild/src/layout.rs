@@ -6937,8 +6937,15 @@ fn test_no_disallowed_overlaps() {
     let arena = colosseum::sync::Arena::new();
     let auxiliary = crate::input_data::AuxiliaryFiles::new(&args, &arena, &OsFileSystem).unwrap();
     let herd = Default::default();
-    let symbol_db =
-        crate::symbol_db::SymbolDb::<Elf64>::new(&args, output_kind, &auxiliary, &herd).unwrap();
+    let herd_drops = Default::default();
+    let symbol_db = crate::symbol_db::SymbolDb::<Elf64>::new(
+        &args,
+        output_kind,
+        &auxiliary,
+        &herd,
+        &herd_drops,
+    )
+    .unwrap();
 
     let (_, section_layouts, _) = compute_layout_sections::<Elf64>(
         &[],
