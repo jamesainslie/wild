@@ -29,6 +29,7 @@ pub(crate) mod gdb_index;
 pub(crate) mod glob_match;
 pub(crate) mod grouping;
 pub(crate) mod hash;
+pub(crate) mod herd_drops;
 pub(crate) mod host;
 pub(crate) mod input_data;
 pub(crate) mod input_section_id;
@@ -163,13 +164,19 @@ pub fn setup_tracing(args: &Args) -> Result<(), AlreadyInitialised> {
 /// option, but likely won't save any time, since the bulk of the work done during drop (unmapping
 /// pages) will still happen anyway.
 pub struct Linker<F: FileSystem = OsFileSystem> {
+    /// Drops the values in `herd` that need dropping. `Drop` runs it explicitly before freeing
+    /// anything else. It comes first so that, even without that, it drops before the herd and the
+    /// inputs that those values borrow.
+    herd_drops: herd_drops::HerdDrops,
+
     /// We store our input files here once we've read them.
     inputs_arena: Arena<input_data::InputFile<F::Input>>,
 
     linker_plugin_arena: Arena<linker_plugins::LoadedPlugin>,
 
     /// Anything that doesn't need a custom Drop implementation can go in here. In practice, it's
-    /// mostly just the decompressed copy of compressed string-merge sections.
+    /// mostly just the decompressed copy of compressed string-merge sections. Values that do need
+    /// dropping can go in here too if they're also passed to `herd_drops`.
     herd: bumpalo_herd::Herd,
 
     /// We'll fill this in when we're done linking and start shutting down. Once this is dropped,
@@ -209,6 +216,7 @@ impl<F: FileSystem> Linker<F> {
         let (guard_a, guard_b) = timing_guard!("Link");
 
         Self {
+            herd_drops: Default::default(),
             file_system: std::sync::Arc::new(file_system),
             inputs_arena: Arena::new(),
             linker_plugin_arena: Arena::new(),
@@ -361,7 +369,8 @@ impl<F: FileSystem> Linker<F> {
             self.file_system.as_ref(),
         )?;
 
-        let mut symbol_db = symbol_db::SymbolDb::new(args, output_kind, &auxiliary, &self.herd)?;
+        let mut symbol_db =
+            symbol_db::SymbolDb::new(args, output_kind, &auxiliary, &self.herd, &self.herd_drops)?;
         let mut per_symbol_flags = PerSymbolFlags::new();
 
         symbol_db.add_inputs(
@@ -449,6 +458,7 @@ impl Default for Linker<OsFileSystem> {
 impl<F: FileSystem> Drop for Linker<F> {
     fn drop(&mut self) {
         timing_phase!("Drop inputs");
+        self.herd_drops.run();
         self.inputs_arena = Arena::new();
         self.herd = Default::default();
     }
